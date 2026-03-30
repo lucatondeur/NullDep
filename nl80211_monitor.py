@@ -40,3 +40,37 @@ full_packet = nl_hdr + genl_hdr + attr
 
 # Sends full packet to the kernel
 netlink_socket.send(full_packet)
+
+# Having now sent the request, the kernel will send back a reply in the socket buffer, which we have to unpack in reverse to how we packed the request
+
+# Receive the kernel's response with a buffer (the maximum amount of data to be received) of 2048 bytes
+reply = netlink_socket.recv(2048)
+
+# Unpack the Main NetLink Header in "Little Endian" byte order (denoted by <) in the following order: I (4-byte length), H (2-byte type), H (2-byte flags), I (4-byte sequence), I (4-byte PID)
+nl_len, nl_type, nl_flags, nl_seq, nl_pid = struct.unpack("<IHHII", reply[:16])
+
+# A NetLink type of 2 is a NetLink message error (NLMSG_ERROR), meaning the kernel rejected the request
+if nl_type == 2:
+    print("Error: Kernel returned a NetLink error.")
+    exit()
+    
+# Offset 16 to 20, unpack the Generic NetLink Header in "Little Endian" byte order (denoted by <) in the following order: B (1-byte command), B (1-byte version), H (2-byte reserved)
+genl_cmd, genl_ver, _ = struct.unpack("<BBH", reply[16:20])
+
+# Starting at offset 20, the  message is a series of attributes. Of these attributes, we are looking for the one labelled CTRL_ATTR_FAMILY_ID, which contains the dynamic number we need. In the kernel's Controller family, this specific attribute always has an ID of 1
+CTRL_ATTR_FAMILY_ID = 1
+
+position = 20
+while position < nl_len:
+    # Formatted in "Little Endian" byte order (denoted by <), each attribute starts with a 4-byte header in the following order: H (2-byte length), H (2-byte type)
+    attr_len, attr_type = struct.unpack("<HH", reply[position:position+4])
+    
+    # Only the type that matches the target ID (1) is needed
+    if attr_type == CTRL_ATTR_FAMILY_ID:
+        # The ID itself is a 2-byte unsigned short (H), which follows the 4-byte header, hence the offset. struct.unpack() returns a tuple, hence [0] to access index 0
+        family_id = struct.unpack("<H", reply[position+4:position+6])[0]
+        print(f"Found nl80211 Family ID: {family_id}")
+        break
+    
+    # Move to the next attribute (attributes are aligned to 4 bytes) by rounding the current attribute length up to the nearest multiple of 4
+    position += (attr_len + 3) & ~3
