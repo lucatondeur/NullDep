@@ -1,8 +1,30 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 # nl80211 is the Linux NetLink-based interface for wireless tools, which will be managed in order to monitor traffic, hence the name
 
 import socket # Provides low-level networking capabilities
 import struct # Allows conversion into binary data
+import sys
 import os # Allows interaction with operating system
+
+command = sys.argv[0]
+
+if len(sys.argv) > 1:
+    subcommand = sys.argv[1]
+
+if len(sys.argv) > 2:
+    interface = sys.argv[2]
+
+subcommands = {
+    1: "-h", # help
+    2: "dwi" # display wireless interfaces
+}
+
+subcommand_descriptions = {
+    1: "help",
+    2: "display wireless interfaces"
+}
 
 
 # Netlink constants
@@ -86,71 +108,77 @@ INTERFACE_MODES = {
     6: "Monitor"
 }
 
-# Get raw interface names from the file system
-try:
-    # print("\n-------- Discovered Wireless Interfaces --------")
-    counter = 0
-    with open("/proc/net/dev", "r") as f:
-        lines = f.readlines()[2:]
-        for line in lines:
-            iface = line.split()[0].replace(":", "")
-            
-            if iface != "lo" and not iface.startswith("eth") and not iface.startswith("docker"):
-                try:
-                    idx = socket.if_nametoindex(iface)
-                except OSError:
-                    continue
-                
-                # Attribute formatted as [Length][Type][Value] by concatenating a 4-byte attribute header (length = 4 bytes + size of hardware index (4 bytes), type = NL80211_ATTR_IFINDEX) with a 4-byte payload (value = idx)
-                interface_attr = struct.pack("<HH", 8, NL80211_ATTR_IFINDEX) + struct.pack("<I", idx) # <HH packs two two-byte unsigned shorts (each unsigned short denoted by an H) in "Little Endian" byte order (denoted by <) and <I packs a four-byte unsigned int
-                
-                # Generic NetLink Header formatted as [Command][Version][Reserved], where command = NL80211_CMD_GET_INTERFACE, version = 1, reserved = 0 (When fields are marked as reserved, the kernel strictly expects them to be 0)
-                wifi_genl_hdr = struct.pack("<BBH", NL80211_CMD_GET_INTERFACE, 1, 0) # <BBH packs two one-byte unsigned chars (each unsigned char denoted by a B) and one two-byte unsigned short (denoted by an H) in "Little Endian" byte order (denoted by <)
-                
-                # Main NetLink Header formatted as [Length][Type][Flags][Sequence][PID], where length = 16 bytes + size of the Generic NetLink Header and attribute in bytes, type = family_id, flags = 1 (meaning "request" (NLM_F_REQUEST)), and sequence (acts as a tracking number for the message) and PID (identifies the socket belonging to the process) = 0, letting the kernel fill those in
-                wifi_msg_length = 16 + len(wifi_genl_hdr) + len(interface_attr)
-                wifi_nl_hdr = struct.pack("<IHHII", wifi_msg_length, family_id, 1, 1, 0) # <IHHII packs three four-byte unsigned ints (each unsigned int denoted by an I) and two two-byte unsigned shorts (denoted by an H) in "Little Endian" byte order (denoted by <)
-                
-                # Sends full packet to the kernel
-                netlink_socket.send(wifi_nl_hdr + wifi_genl_hdr + interface_attr)
-                
-                # Having now sent the request, the kernel will send back a reply in the socket buffer, which we have to unpack in reverse to how we packed the request
-                
-                # Receive the kernel's response with a buffer (the maximum amount of data to be received) of 4096 bytes
-                driver_reply = netlink_socket.recv(4096)
-                
-                # Unpack the Main NetLink Header in "Little Endian" byte order (denoted by <) in the following order: I (4-byte length), H (2-byte type), H (2-byte flags), I (4-byte sequence), I (4-byte PID)
-                reply_len, _, _, _, _ = struct.unpack("<IHHII", driver_reply[:16])
-                
-                # Initialise the binary scanning pointer at byte offset 20, skipping past the 16-byte Main NetLink Header and the 4-byte Generic NetLink Header to reach the start of the response attributes
-                position = 20
-                
-                # Initialise a default state string for the active interface mode in case the driver fails to return a valid operating type attribute
-                mode_str = "Unknown"
-                
-                # Iterate through the remainder of the packet payload
-                while position < reply_len:
-                    # Formatted in "Little Endian" byte order (denoted by <), each attribute starts with a 4-byte header in the following order: H (2-byte length), H (2-byte type)
-                    attr_len, attr_type = struct.unpack("<HH", driver_reply[position:position+4])
-                    
-                    # Only the type that matches the NL80211_ATTR_IFTYPE constant is needed
-                    if attr_type == NL80211_ATTR_IFTYPE:
-                        
-                        # Unpack the operating mode value as a 4-byte unsigned integer (I) following the 4-byte attribute header, accessing index 0 since struct.unpack() returns a tuple
-                        mode_int = struct.unpack("<I", driver_reply[position+4:position+8])[0]
-                        
-                        # Map the extracted integer against the INTERFACE_MODES translation dictionary
-                        mode_str = INTERFACE_MODES.get(mode_int, f"Unknown ({mode_int})")
-                        break
-                    
-                    # Move to the next attribute (attributes are aligned to 4 bytes) by rounding the current attribute length up to the nearest multiple of 4
-                    position += (attr_len + 3) & ~3
-                
-                # Prints in blue
-                print("\033[36m" + f"[{counter}] Interface Name: {iface} | Active Mode: {mode_str}"  + "\033[0m")
-                counter = counter + 1
-except IOError:
-    print("Error: Could not read system interface directory.")
-    exit()
+if len(sys.argv) > 1:
+    if subcommand == subcommands.get(1):
+        for s in subcommands:
+            print(subcommands.get(s) + ": " + subcommand_descriptions.get(s))
     
+    if subcommand == subcommands.get(2):
+        # Get raw interface names from the file system
+        try:
+            # print("\n-------- Discovered Wireless Interfaces --------")
+            counter = 0
+            with open("/proc/net/dev", "r") as f:
+                lines = f.readlines()[2:]
+                for line in lines:
+                    iface = line.split()[0].replace(":", "")
+                
+                    if iface != "lo" and not iface.startswith("eth") and not iface.startswith("docker"):
+                        try:
+                            idx = socket.if_nametoindex(iface)
+                        except OSError:
+                            continue
+                    
+                        # Attribute formatted as [Length][Type][Value] by concatenating a 4-byte attribute header (length = 4 bytes + size of hardware index (4 bytes), type = NL80211_ATTR_IFINDEX) with a 4-byte payload (value = idx)
+                        interface_attr = struct.pack("<HH", 8, NL80211_ATTR_IFINDEX) + struct.pack("<I", idx) # <HH packs two two-byte unsigned shorts (each unsigned short denoted by an H) in "Little Endian" byte order (denoted by <) and <I packs a four-byte unsigned int
+                    
+                        # Generic NetLink Header formatted as [Command][Version][Reserved], where command = NL80211_CMD_GET_INTERFACE, version = 1, reserved = 0 (When fields are marked as reserved, the kernel strictly expects them to be 0)
+                        wifi_genl_hdr = struct.pack("<BBH", NL80211_CMD_GET_INTERFACE, 1, 0) # <BBH packs two one-byte unsigned chars (each unsigned char denoted by a B) and one two-byte unsigned short (denoted by an H) in "Little Endian" byte order (denoted by <)
+                    
+                        # Main NetLink Header formatted as [Length][Type][Flags][Sequence][PID], where length = 16 bytes + size of the Generic NetLink Header and attribute in bytes, type = family_id, flags = 1 (meaning "request" (NLM_F_REQUEST)), and sequence (acts as a tracking number for the message) and PID (identifies the socket belonging to the process) = 0, letting the kernel fill those in
+                        wifi_msg_length = 16 + len(wifi_genl_hdr) + len(interface_attr)
+                        wifi_nl_hdr = struct.pack("<IHHII", wifi_msg_length, family_id, 1, 1, 0) # <IHHII packs three four-byte unsigned ints (each unsigned int denoted by an I) and two two-byte unsigned shorts (denoted by an H) in "Little Endian" byte order (denoted by <)
+                    
+                        # Sends full packet to the kernel
+                        netlink_socket.send(wifi_nl_hdr + wifi_genl_hdr + interface_attr)
+                        
+                        # Having now sent the request, the kernel will send back a reply in the socket buffer, which we have to unpack in reverse to how we packed the request
+                        
+                        # Receive the kernel's response with a buffer (the maximum amount of data to be received) of 4096 bytes
+                        driver_reply = netlink_socket.recv(4096)
+                        
+                        # Unpack the Main NetLink Header in "Little Endian" byte order (denoted by <) in the following order: I (4-byte length), H (2-byte type), H (2-byte flags), I (4-byte sequence), I (4-byte PID)
+                        reply_len, _, _, _, _ = struct.unpack("<IHHII", driver_reply[:16])
+                        
+                        # Initialise the binary scanning pointer at byte offset 20, skipping past the 16-byte Main NetLink Header and the 4-byte Generic NetLink Header to reach the start of the response attributes
+                        position = 20
+                        
+                        # Initialise a default state string for the active interface mode in case the driver fails to return a valid operating type attribute
+                        mode_str = "Unknown"
+                        
+                        # Iterate through the remainder of the packet payload
+                        while position < reply_len:
+                            # Formatted in "Little Endian" byte order (denoted by <), each attribute starts with a 4-byte header in the following order: H (2-byte length), H (2-byte type)
+                            attr_len, attr_type = struct.unpack("<HH", driver_reply[position:position+4])
+                            
+                            # Only the type that matches the NL80211_ATTR_IFTYPE constant is needed
+                            if attr_type == NL80211_ATTR_IFTYPE:
+                                
+                                # Unpack the operating mode value as a 4-byte unsigned integer (I) following the 4-byte attribute header, accessing index 0 since struct.unpack() returns a tuple
+                                mode_int = struct.unpack("<I", driver_reply[position+4:position+8])[0]
+                                
+                                # Map the extracted integer against the INTERFACE_MODES translation dictionary
+                                mode_str = INTERFACE_MODES.get(mode_int, f"Unknown ({mode_int})")
+                                break
+                            
+                            # Move to the next attribute (attributes are aligned to 4 bytes) by rounding the current attribute length up to the nearest multiple of 4
+                            position += (attr_len + 3) & ~3
+                        
+                        # Prints in blue
+                        print("\033[36m" + f"[{counter}] Interface Name: {iface} | Active Mode: {mode_str}"  + "\033[0m")
+                        counter = counter + 1
+        except IOError:
+            print("Error: Could not read system interface directory.")
+            exit()
+        
 
