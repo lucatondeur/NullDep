@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "NullDep"
+version = "1.0.0"
+description = "WiFi Cracking Suite"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+	"Operating System :: POSIX :: Linux",
+	"Programming Language :: Python :: 3"
+]
+
+[project.scripts]
+nulldep = "nulldep.nl80211_monitor:main"
+
