@@ -7,6 +7,7 @@ import socket # Provides low-level networking capabilities
 import struct # Allows conversion into binary data
 import sys
 import os # Allows interaction with operating system
+from functions import *
 
 command = sys.argv[0]
 if len(sys.argv) == 1:
@@ -18,58 +19,69 @@ if len(sys.argv) > 1:
 if len(sys.argv) > 2:
     interface = sys.argv[2]
 
+if len(sys.argv) > 3:
+    mode = sys.argv[3]
+
 subcommands = {
     1: "-h", # help
-    2: "dwi" # display wireless interfaces
+    2: "dwi", # display wireless interfaces
+    3: "sim" # set wireless interface
 }
 
 subcommand_descriptions = {
     1: "help",
-    2: "display wireless interfaces"
+    2: "display wireless interfaces",
+    3: "set interface mode e.g. managed, monitor"
 }
 
 
-# Netlink constants
+# SYSTEM & NETLINK PLATFORM CONSTANTS
 AF_NETLINK = 16 # Address family 16 (NetLink) is the kernel user interface device (LAYER 1)
-SOCK_RAW = 3 # Socket type 3 specifies that raw binary should be sent to ther driver
+SOCK_RAW = 3 # Socket type 3 specifies that raw binary should be sent to the driver
 NETLINK_GENERIC = 16 # Protocol number 16 (Generic Netlink) acts as a container family for many sub-families, including nl80211 (WiFi) (LAYER 2)
 
-# Message constants
+# NETLINK BUS CONTROLLER CONSTANTS
 GENL_ID_CTRL = 16 # Generic NetLink ID 16 routes the packet to the NetLink Controller (LAYER 3)
 CTRL_CMD_GETFAMILY = 3 # Controller command 3 triggers the ctrl_getfamily function to resolve a family ID (LAYER 4)
-CTRL_ATTR_FAMILY_NAME = 2 # Attribute type 2 identifies the following payload as the string name of the target family (LAYER 5)
+CTRL_ATTR_FAMILY_NAME = 2 # Contoller attribute type 2 identifies the following payload as the string name of the target family (LAYER 5)
+CTRL_ATTR_FAMILY_ID = 1 # Controller attribute type 1 identifies a response payload containing the requested dynamic family ID (LAYER 5)
 
-# nl80211 wireless constants
+# NL80211 WIRELESS CONTROLLER CONSTANTS
 NL80211_CMD_GET_INTERFACE = 5 # Command 5 requests information about the wireless interfaces
+NL80211_CMD_SET_INTERFACE = 6 # Command 6 alters an existing interface's operational mode
 NL80211_ATTR_IFINDEX = 3 # Attribute type 3 holds the interface's numerical index
-NL80211_ATTR_IFTYPE = 5 # Attribute type 5 identifies the current operation mode (e.g., managed, monitor)
+NL80211_ATTR_IFTYPE = 5 # Attribute type 5 identifies the current operational mode (e.g., managed, monitor)
+
+# NATIVE HARDWARE OPERATIONAL MODES
+NL80211_IFTYPE_STATION = 2 # Interface type 2 represents standard station mode for connecting to an access point (Managed Mode)
+NL80211_IFTYPE_MONITOR = 6 # Interface type 6 represents raw radio frequency  spectrum monitoring profile (Monitor Mode)
+
+# RTNETLINK (ROUTE BUS) PLATFORM CONSTANTS
+NETLINK_ROUTE = 0
+RTM_NEWLINK = 16
+IFF_UP = 0x1
 
 # Numerical wireless mode translations
 INTERFACE_MODES = {
-    2: "Managed",
-    6: "Monitor"
+    NL80211_IFTYPE_STATION: "Managed",
+    NL80211_IFTYPE_MONITOR: "Monitor"
 }
 
 def main():
-    # Create the socket
-    try:
-        netlink_socket = socket.socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC) # socket.socket(Family, Type, Protocol)
-        netlink_socket.bind((0, 0)) # bind(Port ID (PID), Multicast Groups) binds zero value to the kernel, which mean that the PID can be set to anything as long as it is unique, and no general broadcast groups are being subscribed to
-    # Throws when user has inadequate permissions, as Linux only allows root users to access raw sockets
-    except PermissionError:
-        print("Error: NetLink access requires root/sudo.")
-        exit()
+    # Initialise NetLink socket
+    netlink_socket = nl_socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC)
 
     # Attribute formatted as [Length][Type][Value], where length = 4 bytes + size of name in bytes, type = CTRL_ATTR_FAMILY_NAME, and value = name
     name = b"nl80211\0" # Name of the WiFi subsystem, written as a null-terminated byte string, hence b prior to quotation marks and a null terminator (\0)
-    attr = struct.pack("<HH", 4 + len(name), CTRL_ATTR_FAMILY_NAME) + name # <HH packs two two-byte unsigned shorts (each unsigned short denoted by an H) in "Little Endian" byte order (denoted by <)
+    length = 4 + len(name)
+    attr = attribute(length, CTRL_ATTR_FAMILY_NAME, name)
 
     # Generic NetLink Header formatted as [Command][Version][Reserved], where command = CTRL_CMD_GETFAMILY, version = 1, reserved = 0 (When fields are marked as reserved, the kernel strictly expects them to be 0)
-    genl_hdr = struct.pack("<BBH", CTRL_CMD_GETFAMILY, 1, 0) # <BBH packs two one-byte unsigned chars (each unsigned char denoted by a B) and one two-byte unsigned short (denoted by an H) in "Little Endian" byte order (denoted by <)
+    genl_hdr = generic_nl_header(CTRL_CMD_GETFAMILY, 1, 0)
 
-    # Main NetLink Header formatted as [Length][Type][Flags][Sequence][PID], where length = 16 bytes + size of the Generic NetLink Header and attribute in bytes, type = GENL_ID_CTRL, flags = 1 (meaning "request" (NLM_F_REQUEST)), and sequence (acts as a tracking number for the message) and PID (identifies the socket belonging to the process) = 0, letting the kernel fill those in
+    # Main NetLink Header formatted as [Length][Type][Flags][Sequence][PID], where length = 16 bytes + size of the Generic NetLink Header and attribute in bytes, type = GENL_ID_CTRL, flags = 1 (meaning "request" (NLM_F_REQUEST)), sequence (acts as a tracking number for the message), and PID (identifies the socket belonging to the process) = 0, letting the kernel fill those in
     msg_length = 16 + len(genl_hdr) + len(attr)
-    nl_hdr = struct.pack("<IHHII", msg_length, GENL_ID_CTRL, 1, 0, 0) # <IHHII packs three four-byte unsigned ints (each unsigned int denoted by an I) and two two-byte unsigned shorts (denoted by an H) in "Little Endian" byte order (denoted by <)
+    nl_hdr = main_nl_header(msg_length, GENL_ID_CTRL, 1, 0, 0)
 
     # Full packet formatted as [Main NetLink Header][General NetLink Header][Attribute]
     full_packet = nl_hdr + genl_hdr + attr
@@ -92,29 +104,14 @@ def main():
         
     # Offset 16 to 20, unpack the Generic NetLink Header in "Little Endian" byte order (denoted by <) in the following order: B (1-byte command), B (1-byte version), H (2-byte reserved)
     genl_cmd, genl_ver, _ = struct.unpack("<BBH", reply[16:20])
-
-    # Starting at offset 20, the  message is a series of attributes. Of these attributes, we are looking for the one labelled CTRL_ATTR_FAMILY_ID, which contains the dynamic number we need. In the kernel's Controller family, this specific attribute always has an ID of 1
-    CTRL_ATTR_FAMILY_ID = 1
-
-    position = 20
-    while position < nl_len:
-        # Formatted in "Little Endian" byte order (denoted by <), each attribute starts with a 4-byte header in the following order: H (2-byte length), H (2-byte type)
-        attr_len, attr_type = struct.unpack("<HH", reply[position:position+4])
-        
-        # Only the type that matches the target ID (1) is needed
-        if attr_type == CTRL_ATTR_FAMILY_ID:
-            # The ID itself is a 2-byte unsigned short (H), which follows the 4-byte header, hence the offset. struct.unpack() returns a tuple, hence [0] to access index 0
-            family_id = struct.unpack("<H", reply[position+4:position+6])[0]
-            # print(f"Found nl80211 Family ID: {family_id}")
-            break
-        
-        # Move to the next attribute (attributes are aligned to 4 bytes) by rounding the current attribute length up to the nearest multiple of 4
-        position += (attr_len + 3) & ~3
+    
+    # family_id is a 2-byte unsigned short (H)
+    family_id = attribute_unpack(reply, nl_len, CTRL_ATTR_FAMILY_ID, "<H")
+    # print(f"Found nl80211 Family ID: {family_id}")
 
     if len(sys.argv) >= 1:
         if subcommand == subcommands.get(1):
-            for s in subcommands:
-                print(subcommands.get(s) + ": " + subcommand_descriptions.get(s))
+            nulldep_help(subcommands, subcommand_descriptions)
         
         elif subcommand == subcommands.get(2):
             # Get raw interface names from the file system
@@ -133,15 +130,15 @@ def main():
                                 continue
                         
                             # Attribute formatted as [Length][Type][Value] by concatenating a 4-byte attribute header (length = 4 bytes + size of hardware index (4 bytes), type = NL80211_ATTR_IFINDEX) with a 4-byte payload (value = idx)
-                            interface_attr = struct.pack("<HH", 8, NL80211_ATTR_IFINDEX) + struct.pack("<I", idx) # <HH packs two two-byte unsigned shorts (each unsigned short denoted by an H) in "Little Endian" byte order (denoted by <) and <I packs a four-byte unsigned int
+                            interface_attr = attribute(8, NL80211_ATTR_IFINDEX, struct.pack("<I", idx))
                         
                             # Generic NetLink Header formatted as [Command][Version][Reserved], where command = NL80211_CMD_GET_INTERFACE, version = 1, reserved = 0 (When fields are marked as reserved, the kernel strictly expects them to be 0)
-                            wifi_genl_hdr = struct.pack("<BBH", NL80211_CMD_GET_INTERFACE, 1, 0) # <BBH packs two one-byte unsigned chars (each unsigned char denoted by a B) and one two-byte unsigned short (denoted by an H) in "Little Endian" byte order (denoted by <)
+                            wifi_genl_hdr = generic_nl_header(NL80211_CMD_GET_INTERFACE, 1, 0)
                         
-                            # Main NetLink Header formatted as [Length][Type][Flags][Sequence][PID], where length = 16 bytes + size of the Generic NetLink Header and attribute in bytes, type = family_id, flags = 1 (meaning "request" (NLM_F_REQUEST)), and sequence (acts as a tracking number for the message) and PID (identifies the socket belonging to the process) = 0, letting the kernel fill those in
+                            # Main NetLink Header formatted as [Length][Type][Flags][Sequence][PID], where length = 16 bytes + size of the Generic NetLink Header and attribute in bytes, type = family_id, flags = 1 (meaning "request" (NLM_F_REQUEST)), sequence (acts as a tracking number for the message), and PID (identifies the socket belonging to the process) = 0, letting the kernel fill those in
                             wifi_msg_length = 16 + len(wifi_genl_hdr) + len(interface_attr)
-                            wifi_nl_hdr = struct.pack("<IHHII", wifi_msg_length, family_id, 1, 1, 0) # <IHHII packs three four-byte unsigned ints (each unsigned int denoted by an I) and two two-byte unsigned shorts (denoted by an H) in "Little Endian" byte order (denoted by <)
-                        
+                            wifi_nl_hdr = main_nl_header(wifi_msg_length, family_id, 1, 1, 0)
+                            
                             # Sends full packet to the kernel
                             netlink_socket.send(wifi_nl_hdr + wifi_genl_hdr + interface_attr)
                             
@@ -159,23 +156,11 @@ def main():
                             # Initialise a default state string for the active interface mode in case the driver fails to return a valid operating type attribute
                             mode_str = "Unknown"
                             
-                            # Iterate through the remainder of the packet payload
-                            while position < reply_len:
-                                # Formatted in "Little Endian" byte order (denoted by <), each attribute starts with a 4-byte header in the following order: H (2-byte length), H (2-byte type)
-                                attr_len, attr_type = struct.unpack("<HH", driver_reply[position:position+4])
-                                
-                                # Only the type that matches the NL80211_ATTR_IFTYPE constant is needed
-                                if attr_type == NL80211_ATTR_IFTYPE:
-                                    
-                                    # Unpack the operating mode value as a 4-byte unsigned integer (I) following the 4-byte attribute header, accessing index 0 since struct.unpack() returns a tuple
-                                    mode_int = struct.unpack("<I", driver_reply[position+4:position+8])[0]
-                                    
-                                    # Map the extracted integer against the INTERFACE_MODES translation dictionary
-                                    mode_str = INTERFACE_MODES.get(mode_int, f"Unknown ({mode_int})")
-                                    break
-                                
-                                # Move to the next attribute (attributes are aligned to 4 bytes) by rounding the current attribute length up to the nearest multiple of 4
-                                position += (attr_len + 3) & ~3
+                            # Unpack the operating mode value as a 4-byte unsigned integer (I) following the 4-byte attribute header, accessing index 0 since struct.unpack() returns a tuple
+                            mode_int = attribute_unpack(driver_reply, reply_len, NL80211_ATTR_IFTYPE, "<I")
+                            
+                            # Map the extracted integer against the INTERFACE_MODES translation dictionary
+                            mode_str = INTERFACE_MODES.get(mode_int, f"Unknown ({mode_int})")
                             
                             # Prints in blue
                             print("\033[36m" + f"[{counter}] Interface Name: {iface} | Active Mode: {mode_str}"  + "\033[0m")
@@ -183,6 +168,23 @@ def main():
             except IOError:
                 print("Error: Could not read system interface directory.")
                 exit()
+            
+        elif subcommand == subcommands.get(3):
+            set_link_state(interface, "down")
+            
+            if mode == "man":
+                request_mode = NL80211_IFTYPE_STATION
+                
+            if mode == "mon":
+                request_mode = NL80211_IFTYPE_MONITOR
+                
+            set_interface_mode(interface, request_mode, family_id, netlink_socket)
+            
+            set_link_state(interface, "up")
+
+                
+                
+                
                 
         else:
             print("Unknown subcommand")
