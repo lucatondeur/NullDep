@@ -7,7 +7,6 @@ import socket # Provides low-level networking capabilities
 import struct # Allows conversion into binary data
 import sys
 import os # Allows interaction with operating system
-from functions import *
 
 command = sys.argv[0]
 if len(sys.argv) == 1:
@@ -66,6 +65,8 @@ INTERFACE_MODES = {
     NL80211_IFTYPE_STATION: "Managed",
     NL80211_IFTYPE_MONITOR: "Monitor"
 }
+
+from nulldep.functions import *
 
 def main():
     # Initialise NetLink socket

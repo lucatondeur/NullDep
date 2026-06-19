@@ -1,6 +1,9 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import socket
 import struct
-from nl80211_monitor import *
+from nulldep.nl80211_monitor import *
 
 def nl_socket(Family, Type, Protocol):
     # Create the socket
