@@ -16,3 +16,5 @@ classifiers = [
 [project.scripts]
 nulldep = "nulldep.nl80211_monitor:main"
 
+[tools.setuptools.packages.find]
+where = ["src"]
