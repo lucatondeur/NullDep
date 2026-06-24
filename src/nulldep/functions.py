@@ -3,7 +3,9 @@
 
 import socket
 import struct
+import sys
 from nulldep.nl80211_monitor import *
+import time
 
 def nl_socket(Family, Type, Protocol):
     # Create the socket
@@ -54,8 +56,9 @@ def attribute_unpack(reply, reply_length, target_type, target_size):
     return target_id
 
 def nulldep_help(subcommands, subcommand_descriptions):
+    print("Subcommands:	Descriptions: \n")
     for s in subcommands:
-        print(subcommands.get(s) + ": " + subcommand_descriptions.get(s))
+        print(subcommands.get(s) + " 		" + subcommand_descriptions.get(s))
 
 def set_link_state(interface, state):
     # Initialise an independent raw routing bus socket
@@ -87,7 +90,6 @@ def set_link_state(interface, state):
     finally:
         rt_socket.close()
 
-
 def set_interface_mode(interface, request_mode, family_id, netlink_socket):
     idx = socket.if_nametoindex(interface)
     attr_idx = attribute(8, NL80211_ATTR_IFINDEX, struct.pack("<I", idx))
@@ -99,6 +101,32 @@ def set_interface_mode(interface, request_mode, family_id, netlink_socket):
     
     netlink_socket.send(nl_hdr + genl_hdr + attr)
     print(f"{INTERFACE_MODES.get(request_mode)} mode enabled")
-        
+    
+def switch_channels(interface, channel, family_id, netlink_socket):
+    frequency_mhz = CHANNEL_FREQUENCIES.get(channel, 2437)
+    
+    idx = socket.if_nametoindex(interface)
+    attr_idx = attribute(8, NL80211_ATTR_IFINDEX, struct.pack("<I", idx))
+    attr_freq = attribute(8, NL80211_ATTR_WIPHY_FREQ, struct.pack("<I", frequency_mhz))
+    attr_width = attribute(8, NL80211_ATTR_WIPHY_CHANNEL_TYPE, struct.pack("<I", NL80211_CHAN_NO_HT))
+    attr = attr_idx + attr_freq + attr_width
+    
+    wiphy_genl_hdr = generic_nl_header(NL80211_CMD_SET_WIPHY, 1, 0)
+    
+    msg_length = 16 + len(wiphy_genl_hdr) + len(attr)
+    wiphy_nl_hdr = main_nl_header(msg_length, family_id, 1, 1, 0)
+    
+    try:
+        netlink_socket.send(wiphy_nl_hdr + wiphy_genl_hdr + attr)
+        #print(f"CH: {channel}")
+        #reply = netlink_socket.recv(4096)
+        #nl_len, nl_type, _, _, _ = struct.unpack("<IHHII", reply[:16])
+        #print(f"nl_type = {nl_type}")
+    except OSError as e:
+        print(f"NetLink Channel Switch Error: {e}")
+
+
+
+    
 
     
