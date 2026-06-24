@@ -159,7 +159,42 @@ def scan_networks(sniff_socket, discovered_networks):
         if mac_hdr[0] != 0x80:
             continue
 
+def cycle_channels(interface, family_id, netlink_socket):
+    
+    sniff_socket = socket.socket(AF_PACKET, SOCK_RAW, socket.htons(ETH_P_ALL))
+    sniff_socket.bind((interface, 0))
+    sniff_socket.setblocking(False)
+    
+    discovered_networks = {}
+    
+    channel = 1
+    
+    sys.stdout.write("\033[2J" + "\033[?25l")
+    sys.stdout.flush()
+    
+    try:
+        while True:
+            screen = "\033[H"
+            switch_channels(interface, channel, family_id, netlink_socket)
+            screen = screen + f"CH: {channel}   	BSSID			SSID" + "\n"
+            screen = screen + "\n"
 
+            scan_networks(sniff_socket, discovered_networks)
+            for i in discovered_networks:
+                screen = screen + f"   		{discovered_networks.get(i)}	{i}" + "\n"
+                
+            sys.stdout.write(screen)
+
+
+            #print(discovered_networks)
+            channel = channel + 1
+            if channel > 14:
+                channel = 1
+                
+    except KeyboardInterrupt:
+        print("", end="\r")
+        sys.stdout.write("\033[?25h" + "Quitting...")
+        sys.stdout.flush()
     
 
     
