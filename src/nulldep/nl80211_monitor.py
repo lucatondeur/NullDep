@@ -24,13 +24,15 @@ if len(sys.argv) > 3:
 subcommands = {
     1: "-h", # help
     2: "dwi", # display wireless interfaces
-    3: "sim" # set wireless interface
+    3: "sim", # set wireless interface
+    4: "scan" # scan wireless networks
 }
 
 subcommand_descriptions = {
     1: "help",
     2: "display wireless interfaces",
-    3: "set interface mode e.g. managed, monitor"
+    3: "set interface mode e.g. managed, monitor",
+    4: "scan wireless interfaces"
 }
 
 
@@ -51,6 +53,22 @@ NL80211_CMD_SET_INTERFACE = 6 # Command 6 alters an existing interface's operati
 NL80211_ATTR_IFINDEX = 3 # Attribute type 3 holds the interface's numerical index
 NL80211_ATTR_IFTYPE = 5 # Attribute type 5 identifies the current operational mode (e.g., managed, monitor)
 
+NL80211_CMD_SET_WIPHY = 2 # Command 2 alters physical radio configurations (like frequency)
+NL80211_ATTR_WIPHY = 1 # Attribute 1 targets the physcial radio index (WIPHY ID)
+NL80211_ATTR_WIPHY_FREQ = 38 # Attribute 38 declares the absolute target frequency in MHz
+NL80211_ATTR_WIPHY_CHANNEL_TYPE = 39 # Attribute 39 sets the channel width layout (e.g., 20MHz)
+NL80211_CHAN_NO_HT = 0 # Standard 20MHz legacy channel spacing width
+
+# Maps standard 2.4GHz WiFi channels to their exact kernel Megahertz frequency
+CHANNEL_FREQUENCIES = {
+    1: 2412, 2: 2417, 3: 2422,
+    4: 2427, 5: 2432, 6: 2437,
+    7: 2442, 8: 2447, 9: 2452,
+    10: 2457, 11: 2462, 12: 2467,
+    13: 2472, 14: 2484
+
+}
+
 # NATIVE HARDWARE OPERATIONAL MODES
 NL80211_IFTYPE_STATION = 2 # Interface type 2 represents standard station mode for connecting to an access point (Managed Mode)
 NL80211_IFTYPE_MONITOR = 6 # Interface type 6 represents raw radio frequency  spectrum monitoring profile (Monitor Mode)
@@ -59,6 +77,10 @@ NL80211_IFTYPE_MONITOR = 6 # Interface type 6 represents raw radio frequency  sp
 NETLINK_ROUTE = 0
 RTM_NEWLINK = 16
 IFF_UP = 0x1
+
+# AF_PACKET LINK-LAYER NETWORK CONSTANTS
+AF_PACKET = 17 # Address family 17 (NetLink) allows the sending and receiving of raw packets directly at the link-layer level
+ETH_P_ALL =0x0003 # Protocol filter code to capture absolutely every network frame
 
 # Numerical wireless mode translations
 INTERFACE_MODES = {
@@ -182,7 +204,12 @@ def main():
             set_interface_mode(interface, request_mode, family_id, netlink_socket)
             
             set_link_state(interface, "up")
-
+        
+        elif subcommand == subcommands.get(4):
+            print()
+            #switch_channels(interface, 6, family_id, netlink_socket)
+            #scan_networks(interface)
+            cycle_channels(interface, family_id, netlink_socket)
                 
                 
                 
