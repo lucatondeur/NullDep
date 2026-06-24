@@ -125,6 +125,39 @@ def switch_channels(interface, channel, family_id, netlink_socket):
     except OSError as e:
         print(f"NetLink Channel Switch Error: {e}")
 
+def scan_networks(sniff_socket, discovered_networks):
+
+    start_time = time.time()
+    
+    while time.time() - start_time < 0.5:
+        try:
+            reply = sniff_socket.recv(4096)
+        except BlockingIOError and OSError:
+            time.sleep(0.01)
+            continue
+
+        radiotap_hdr_length = struct.unpack("<H", reply[2:4])[0]
+        mac_hdr = reply[radiotap_hdr_length:]
+        if mac_hdr[0] == 0x80:
+    
+            bssid_raw = mac_hdr[16:22]
+            frame_body = mac_hdr[24:]
+            ie_elements = frame_body[12:]
+
+            if len(ie_elements) >= 2:
+                if ie_elements[0] == 0:
+                    ssid_len = ie_elements[1]
+                    ssid_str = ie_elements[2 : 2 + ssid_len].decode('utf-8', errors='ignore')
+                    
+                    if not ssid_str.strip():
+                        ssid_str = "<hidden SSID>"
+                    
+                    bssid_str = ":".join(f"{b:02x}" for b in bssid_raw)
+                    if discovered_networks.get(ssid_str) != bssid_str:
+                        discovered_networks.update({ssid_str: bssid_str})
+
+        if mac_hdr[0] != 0x80:
+            continue
 
 
     
