@@ -88,7 +88,10 @@ INTERFACE_MODES = {
     NL80211_IFTYPE_MONITOR: "Monitor"
 }
 
-from nulldep.functions import *
+from nulldep.nulldep_help import *
+from nulldep.message_construction import *
+from nulldep.mode_configuration import *
+from nulldep.channel_scanner import *
 
 def main():
     # Initialise NetLink socket
