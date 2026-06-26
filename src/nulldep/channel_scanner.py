@@ -58,8 +58,8 @@ def scan_networks(sniff_socket, discovered_networks):
                         ssid_str = "<hidden SSID>"
                     
                     bssid_str = ":".join(f"{b:02x}" for b in bssid_raw)
-                    if discovered_networks.get(ssid_str) != bssid_str:
-                        discovered_networks.update({ssid_str: bssid_str})
+                    if discovered_networks.get(bssid_str) != ssid_str:
+                        discovered_networks.update({bssid_str: ssid_str})
 
         if mac_hdr[0] != 0x80:
             continue
@@ -86,7 +86,7 @@ def cycle_channels(interface, family_id, netlink_socket):
 
             scan_networks(sniff_socket, discovered_networks)
             for i in discovered_networks:
-                screen = screen + f"   		{discovered_networks.get(i)}	{i}" + "\n"
+                screen = screen + f"   		{i}	{discovered_networks.get(i)}" + "\n"
                 
             sys.stdout.write(screen)
 
