@@ -120,7 +120,7 @@ def cycle_channels(interface, family_id, netlink_socket):
             screen = "\033[H"
             switch_channels(interface, channel, family_id, netlink_socket)
             screen += f"   Scanning channel {channel}" + "\033[K\n\n"
-            screen += f"   BSSID		CH	ENC	CIPHER	AUTH	SSID" + "\033[K\n\n"
+            screen += f"   BSSID			CH	ENC		CIPHER	AUTH	SSID" + "\033[K\n\n"
 
             scan_networks(sniff_socket, discovered_networks)
             for i in discovered_networks:
