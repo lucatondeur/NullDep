@@ -88,6 +88,44 @@ INTERFACE_MODES = {
     NL80211_IFTYPE_MONITOR: "Monitor"
 }
 
+CIPHER_MAP = {
+    0: "NONE",
+    1: "WEP",
+    2: "TKIP",
+    4: "CCMP",
+    8: "GCMP"
+}
+
+AUTH_MAP = {
+    1: "MGT",
+    2: "PSK",
+    3: "FT/MGT",
+    4: "FT/PSK",
+    5: "MGT-256",
+    6: "PSK-256",
+    8: "PSK",
+    9: "FT/SAE",
+    11: "SUITE-B",
+    12: "SUITE-B",
+    18: "OWE",
+    24: "SAE-384"
+}
+
+ENC_MAP = {
+    1: "WPA2",
+    2: "WPA2",
+    3: "WPA2",
+    4: "WPA2",
+    5: "WPA2",
+    6: "WPA2",
+    8: "WPA3",
+    9: "WPA3",
+    11: "WPA3",
+    12: "WPA3",
+    18: "OPN",
+    24: "WPA3"
+}
+
 from nulldep.nulldep_help import *
 from nulldep.message_construction import *
 from nulldep.mode_configuration import *

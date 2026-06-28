@@ -48,18 +48,53 @@ def scan_networks(sniff_socket, discovered_networks):
             bssid_raw = mac_hdr[16:22]
             frame_body = mac_hdr[24:]
             ie_elements = frame_body[12:]
-
+            
             if len(ie_elements) >= 2:
                 if ie_elements[0] == 0:
                     ssid_len = ie_elements[1]
                     ssid_str = ie_elements[2 : 2 + ssid_len].decode('utf-8', errors='ignore')
+                    
+                    pos = 0
+                    
+                    exact_channel = "?"
+                    enc = "?"
+                    cipher = "?"
+                    auth = "?"
+                    
+                    channel_found = False
+                    
+                    while pos < len(ie_elements) - 2:
+                        element_id = ie_elements[pos]
+                        element_len = ie_elements[pos+1]
+                        
+                        
+                        if element_id == 3 and channel_found == False:
+                            exact_channel = ie_elements[pos+2]
+                            channel_found = True
+                            
+                        if element_id == 48:
+                            try:
+                                rsn_bytes = ie_elements[pos + 2 : pos + 2 + element_len]
+                                
+                                cipher_bytes = rsn_bytes[11]
+                                
+                                cipher = CIPHER_MAP.get(cipher_bytes)
+                                
+                                auth_bytes = rsn_bytes[17]
+                                
+                                auth = AUTH_MAP.get(auth_bytes)
+                                enc = ENC_MAP.get(auth_bytes)
+                            except IndexError:
+                                pass
+                            
+                        pos += 2 + element_len
                     
                     if not ssid_str.strip():
                         ssid_str = "<hidden SSID>"
                     
                     bssid_str = ":".join(f"{b:02x}" for b in bssid_raw)
                     if discovered_networks.get(bssid_str) != ssid_str:
-                        discovered_networks.update({bssid_str: ssid_str})
+                        discovered_networks.update({bssid_str: [ssid_str, exact_channel, enc, cipher, auth]})
 
         if mac_hdr[0] != 0x80:
             continue
@@ -81,12 +116,12 @@ def cycle_channels(interface, family_id, netlink_socket):
         while True:
             screen = "\033[H"
             switch_channels(interface, channel, family_id, netlink_socket)
-            screen = screen + f"CH: {channel}   	BSSID			SSID" + "\n"
-            screen = screen + "\n"
+            screen += f"   Scanning channel {channel}" + "\033[K\n\n"
+            screen += f"   BSSID		CH	ENC	CIPHER	AUTH	SSID" + "\033[K\n\n"
 
             scan_networks(sniff_socket, discovered_networks)
             for i in discovered_networks:
-                screen = screen + f"   		{i}	{discovered_networks.get(i)}" + "\n"
+                screen = screen + f"   {i}	{discovered_networks.get(i)[1]}	{discovered_networks.get(i)[2]}	{discovered_networks.get(i)[3]}	{discovered_networks.get(i)[4]}	{discovered_networks.get(i)[0]}" + "\n"
                 
             sys.stdout.write(screen)
 
