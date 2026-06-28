@@ -59,13 +59,35 @@ NL80211_ATTR_WIPHY_FREQ = 38 # Attribute 38 declares the absolute target frequen
 NL80211_ATTR_WIPHY_CHANNEL_TYPE = 39 # Attribute 39 sets the channel width layout (e.g., 20MHz)
 NL80211_CHAN_NO_HT = 0 # Standard 20MHz legacy channel spacing width
 
-# Maps standard 2.4GHz WiFi channels to their exact kernel Megahertz frequency
+# Maps standard 2.4GHz and 5GHz WiFi channels to their exact kernel Megahertz frequency
 CHANNEL_FREQUENCIES = {
     1: 2412, 2: 2417, 3: 2422,
+    
     4: 2427, 5: 2432, 6: 2437,
+    
     7: 2442, 8: 2447, 9: 2452,
+    
     10: 2457, 11: 2462, 12: 2467,
-    13: 2472, 14: 2484
+    
+    13: 2472, 14: 2484, 36: 5180,
+    
+    40: 5200, 44: 5220, 48: 5240,
+    
+    52: 5260, 56: 5280, 60: 5300,
+    
+    64: 5320, 100: 5500, 104: 5520,
+    
+    108: 5540, 112: 5560, 116: 5580,
+    
+    120: 5600, 124: 5620, 128: 5640,
+    
+    132: 5660, 136: 5680, 140: 5700,
+    
+    144: 5720, 149: 5745, 153: 5765,
+    
+    157: 5785, 161: 5805, 165: 5825,
+    
+    169: 5845, 173: 5865, 177: 5885
 
 }
 

@@ -71,6 +71,9 @@ def scan_networks(sniff_socket, discovered_networks):
                         if element_id == 3 and channel_found == False:
                             exact_channel = ie_elements[pos+2]
                             channel_found = True
+                        if element_id == 61 and channel_found == False:
+                            exact_channel = ie_elements[pos+2]
+                            channel_found = True
                             
                         if element_id == 48:
                             try:
@@ -125,10 +128,19 @@ def cycle_channels(interface, family_id, netlink_socket):
                 
             sys.stdout.write(screen)
 
-
-            #print(discovered_networks)
-            channel = channel + 1
-            if channel > 14:
+            if channel == 14:
+                channel = 36
+                
+            elif channel < 14:
+                channel = channel + 1
+                
+            elif channel == 144:
+                channel = 149
+                
+            elif channel >= 36:
+                channel += 4
+            
+            if channel > 177:
                 channel = 1
                 
     except KeyboardInterrupt:
