@@ -119,12 +119,12 @@ def cycle_channels(interface, family_id, netlink_socket):
         while True:
             screen = "\033[H"
             switch_channels(interface, channel, family_id, netlink_socket)
-            screen += f"   Scanning channel {channel}" + "\033[K\n\n"
-            screen += f"   BSSID			CH	ENC		CIPHER	AUTH	SSID" + "\033[K\n\n"
+            screen += f"   Scanning channel {channel:<2}" + "\033[K\n\n"
+            screen += f"   {'BSSID':<18}   {'CH':<4}   {'ENC':<5}   {'CIPHER':<7}   {'AUTH':<5}   {'SSID'}" + "\033[K\n\n"
 
             scan_networks(sniff_socket, discovered_networks)
             for i in discovered_networks:
-                screen = screen + f"   {i}	{discovered_networks.get(i)[1]}	{discovered_networks.get(i)[2]}	{discovered_networks.get(i)[3]}	{discovered_networks.get(i)[4]}	{discovered_networks.get(i)[0]}" + "\n"
+                screen = screen + f"   {i:<18}   {discovered_networks.get(i)[1]:<4}   {discovered_networks.get(i)[2]:<5}   {discovered_networks.get(i)[3]:<7}   {discovered_networks.get(i)[4]:<5}   {discovered_networks.get(i)[0]}" + "\n"
                 
             sys.stdout.write(screen)
 
