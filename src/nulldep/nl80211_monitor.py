@@ -270,11 +270,9 @@ def main():
         
         elif subcommand == subcommands.get(4):
             print()
-            #switch_channels(interface, 6, family_id, netlink_socket)
+            #switch_channels(interface, 44, family_id, netlink_socket)
             #scan_networks(interface)
             cycle_channels(interface, family_id, netlink_socket)
-                
-                
                 
                 
         else:

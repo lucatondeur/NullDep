@@ -30,7 +30,7 @@ def switch_channels(interface, channel, family_id, netlink_socket):
     except OSError as e:
         print(f"NetLink Channel Switch Error: {e}")
 
-def scan_networks(sniff_socket, discovered_networks):
+def scan_networks(sniff_socket, discovered_networks, discovered_clients):
 
     start_time = time.time()
     
@@ -43,6 +43,7 @@ def scan_networks(sniff_socket, discovered_networks):
 
         radiotap_hdr_length = struct.unpack("<H", reply[2:4])[0]
         mac_hdr = reply[radiotap_hdr_length:]
+        
         if mac_hdr[0] == 0x80:
     
             bssid_raw = mac_hdr[16:22]
@@ -56,10 +57,7 @@ def scan_networks(sniff_socket, discovered_networks):
                     
                     pos = 0
                     
-                    exact_channel = "?"
-                    enc = "?"
-                    cipher = "?"
-                    auth = "?"
+                    exact_channel, enc, cipher, auth = "?", "?", "?", "?"
                     
                     channel_found = False
                     
@@ -68,12 +66,13 @@ def scan_networks(sniff_socket, discovered_networks):
                         element_len = ie_elements[pos+1]
                         
                         
-                        if element_id == 3 and channel_found == False:
+                        if element_id == 3 and not channel_found:
                             exact_channel = ie_elements[pos+2]
                             channel_found = True
-                        if element_id == 61 and channel_found == False:
+                        if element_id == 61 and not channel_found:
                             exact_channel = ie_elements[pos+2]
                             channel_found = True
+                        
                             
                         if element_id == 48:
                             try:
@@ -81,12 +80,12 @@ def scan_networks(sniff_socket, discovered_networks):
                                 
                                 cipher_bytes = rsn_bytes[11]
                                 
-                                cipher = CIPHER_MAP.get(cipher_bytes)
+                                cipher = CIPHER_MAP.get(cipher_bytes, "?")
                                 
                                 auth_bytes = rsn_bytes[17]
                                 
-                                auth = AUTH_MAP.get(auth_bytes)
-                                enc = ENC_MAP.get(auth_bytes)
+                                auth = AUTH_MAP.get(auth_bytes, "?")
+                                enc = ENC_MAP.get(auth_bytes, "?")
                             except IndexError:
                                 pass
                             
@@ -96,11 +95,16 @@ def scan_networks(sniff_socket, discovered_networks):
                         ssid_str = "<hidden SSID>"
                     
                     bssid_str = ":".join(f"{b:02x}" for b in bssid_raw)
-                    if discovered_networks.get(bssid_str) != ssid_str:
-                        discovered_networks.update({bssid_str: [ssid_str, exact_channel, enc, cipher, auth]})
+                    discovered_networks[bssid_str] = [ssid_str, exact_channel, enc, cipher, auth]
 
-        if mac_hdr[0] != 0x80:
-            continue
+        elif mac_hdr[0] == 72:
+            router_raw = mac_hdr[4:10]
+            router_str = ":".join(f"{r:02x}" for r in router_raw)
+            station_raw = mac_hdr[10:16]
+            station_str = ":".join(f"{s:02x}" for s in station_raw)
+            
+            if station_str != "ff:ff:ff:ff:ff:ff" and station_str != router_str:
+                discovered_clients[station_str] = router_str
 
 def cycle_channels(interface, family_id, netlink_socket):
     
@@ -109,6 +113,7 @@ def cycle_channels(interface, family_id, netlink_socket):
     sniff_socket.setblocking(False)
     
     discovered_networks = {}
+    discovered_clients = {}
     
     channel = 1
     
@@ -117,22 +122,30 @@ def cycle_channels(interface, family_id, netlink_socket):
     
     try:
         while True:
-            screen = "\033[H"
+            screen = "\033[H\033[J"
             switch_channels(interface, channel, family_id, netlink_socket)
             screen += f"   Scanning channel {channel:<2}" + "\033[K\n\n"
-            screen += f"   {'BSSID':<18}   {'CH':<4}   {'ENC':<5}   {'CIPHER':<7}   {'AUTH':<5}   {'SSID'}" + "\033[K\n\n"
+            screen += f"   {'BSSID':<18}   {'CH':<4}   {'ENC':<5}   {'CIPHER':<7}   {'AUTH':<5}   {'SSID':<18}   {'CLIENTS'}" + "\033[K\n\n"
 
-            scan_networks(sniff_socket, discovered_networks)
-            for i in discovered_networks:
-                screen = screen + f"   {i:<18}   {discovered_networks.get(i)[1]:<4}   {discovered_networks.get(i)[2]:<5}   {discovered_networks.get(i)[3]:<7}   {discovered_networks.get(i)[4]:<5}   {discovered_networks.get(i)[0]}" + "\n"
-                
+            scan_networks(sniff_socket, discovered_networks, discovered_clients)
+            for bssid, info in discovered_networks.items():
+                client_count = sum(1 for clients, ap in discovered_clients.items() if ap == bssid)
+                screen += f"   {bssid:<18}   {info[1]:<4}   {info[2]:<5}   {info[3]:<7}   {info[4]:<5}   {info[0]:<18}   {client_count}" + "\033[K\n"
+            
+            screen += "\033[K\n"
+            screen += f"   {'BSSID':<18}   {'STATION':<18}" + "\033[K\n\n"
+            
+            for client, ap in discovered_clients.items():
+                screen += f"   {ap:<18}   {client:<18}" + "\033[K\n"
+            
             sys.stdout.write(screen)
+            sys.stdout.flush()
 
             if channel == 14:
                 channel = 36
                 
             elif channel < 14:
-                channel = channel + 1
+                channel += 1
                 
             elif channel == 144:
                 channel = 149
