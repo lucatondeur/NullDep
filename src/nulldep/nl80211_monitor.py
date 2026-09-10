@@ -258,17 +258,22 @@ def main():
                 exit()
             
         elif subcommand == subcommands.get(3):
-            set_link_state(interface, "down")
-            
-            if mode == "man":
-                request_mode = NL80211_IFTYPE_STATION
-                
-            if mode == "mon":
-                request_mode = NL80211_IFTYPE_MONITOR
-                
-            set_interface_mode(interface, request_mode, family_id, netlink_socket)
-            
-            set_link_state(interface, "up")
+            if len(sys.argv) < 3:
+                print("Error: missing interface and desired mode configuration")
+            elif len(sys.argv) < 4:
+                print("Error: missing desired mode configuration")
+            else:
+                set_link_state(interface, "down")
+
+                if mode == "man":
+                    request_mode = NL80211_IFTYPE_STATION
+
+                if mode == "mon":
+                    request_mode = NL80211_IFTYPE_MONITOR
+
+                set_interface_mode(interface, request_mode, family_id, netlink_socket)
+
+                set_link_state(interface, "up")
         
         elif subcommand == subcommands.get(4):
             print()
