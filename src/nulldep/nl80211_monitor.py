@@ -235,7 +235,7 @@ def main():
                             
                             # Unpack the Main NetLink Header in "Little Endian" byte order (denoted by <) in the following order: I (4-byte length), H (2-byte type), H (2-byte flags), I (4-byte sequence), I (4-byte PID)
                             reply_len, _, _, _, _ = struct.unpack("<IHHII", driver_reply[:16])
-                            
+
                             # Initialise the binary scanning pointer at byte offset 20, skipping past the 16-byte Main NetLink Header and the 4-byte Generic NetLink Header to reach the start of the response attributes
                             position = 20
                             
@@ -251,6 +251,8 @@ def main():
                             # Prints in blue
                             print("\033[36m" + f"[{counter}] Interface Name: {iface} | Active Mode: {mode_str}"  + "\033[0m")
                             counter = counter + 1
+                    if counter == 0:
+                        print("No wireless interfaces found...")
             except IOError:
                 print("Error: Could not read system interface directory.")
                 exit()
