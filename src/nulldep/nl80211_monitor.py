@@ -28,6 +28,13 @@ subcommands = {
     4: "scan" # scan wireless networks
 }
 
+subcommand_arguments = {
+    1: "",
+    2: "",
+    3: "<interface> <mode>",
+    4: "<interface>"
+}
+
 subcommand_descriptions = {
     1: "help",
     2: "display wireless interfaces",
