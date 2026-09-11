@@ -9,18 +9,18 @@ import time
     
 def switch_channels(interface, channel, family_id, netlink_socket):
     frequency_mhz = CHANNEL_FREQUENCIES.get(channel, 2437)
-    
+
     idx = socket.if_nametoindex(interface)
     attr_idx = attribute(8, NL80211_ATTR_IFINDEX, struct.pack("<I", idx))
     attr_freq = attribute(8, NL80211_ATTR_WIPHY_FREQ, struct.pack("<I", frequency_mhz))
     attr_width = attribute(8, NL80211_ATTR_WIPHY_CHANNEL_TYPE, struct.pack("<I", NL80211_CHAN_NO_HT))
     attr = attr_idx + attr_freq + attr_width
-    
+
     wiphy_genl_hdr = generic_nl_header(NL80211_CMD_SET_WIPHY, 1, 0)
-    
+
     msg_length = 16 + len(wiphy_genl_hdr) + len(attr)
     wiphy_nl_hdr = main_nl_header(msg_length, family_id, 1, 1, 0)
-    
+
     try:
         netlink_socket.send(wiphy_nl_hdr + wiphy_genl_hdr + attr)
         #print(f"CH: {channel}")
@@ -29,6 +29,7 @@ def switch_channels(interface, channel, family_id, netlink_socket):
         #print(f"nl_type = {nl_type}")
     except OSError as e:
         print(f"NetLink Channel Switch Error: {e}")
+
 
 def scan_networks(sniff_socket, discovered_networks, discovered_clients):
 
@@ -107,56 +108,60 @@ def scan_networks(sniff_socket, discovered_networks, discovered_clients):
                 discovered_clients[station_str] = router_str
 
 def cycle_channels(interface, family_id, netlink_socket):
-    
-    sniff_socket = socket.socket(AF_PACKET, SOCK_RAW, socket.htons(ETH_P_ALL))
-    sniff_socket.bind((interface, 0))
-    sniff_socket.setblocking(False)
-    
-    discovered_networks = {}
-    discovered_clients = {}
-    
-    channel = 1
-    
-    sys.stdout.write("\033[2J" + "\033[?25l")
-    sys.stdout.flush()
-    
     try:
-        while True:
-            screen = "\033[H\033[J"
-            switch_channels(interface, channel, family_id, netlink_socket)
-            screen += f"   Scanning channel {channel:<2}" + "\033[K\n\n"
-            screen += f"   {'BSSID':<18}   {'CH':<4}   {'ENC':<5}   {'CIPHER':<7}   {'AUTH':<5}   {'SSID':<18}   {'CLIENTS'}" + "\033[K\n\n"
+        sniff_socket = socket.socket(AF_PACKET, SOCK_RAW, socket.htons(ETH_P_ALL))
+        sniff_socket.bind((interface, 0))
+        sniff_socket.setblocking(False)
 
-            scan_networks(sniff_socket, discovered_networks, discovered_clients)
-            for bssid, info in discovered_networks.items():
-                client_count = sum(1 for clients, ap in discovered_clients.items() if ap == bssid)
-                screen += f"   {bssid:<18}   {info[1]:<4}   {info[2]:<5}   {info[3]:<7}   {info[4]:<5}   {info[0]:<18}   {client_count}" + "\033[K\n"
-            
-            screen += "\033[K\n"
-            screen += f"   {'BSSID':<18}   {'STATION':<18}" + "\033[K\n\n"
-            
-            for client, ap in discovered_clients.items():
-                screen += f"   {ap:<18}   {client:<18}" + "\033[K\n"
-            
-            sys.stdout.write(screen)
-            sys.stdout.flush()
+        print()
 
-            if channel == 14:
-                channel = 36
-                
-            elif channel < 14:
-                channel += 1
-                
-            elif channel == 144:
-                channel = 149
-                
-            elif channel >= 36:
-                channel += 4
-            
-            if channel > 177:
-                channel = 1
-                
-    except KeyboardInterrupt:
-        print("", end="\r")
-        sys.stdout.write("\033[?25h" + "Quitting...")
+        discovered_networks = {}
+        discovered_clients = {}
+
+        channel = 1
+
+        sys.stdout.write("\033[2J" + "\033[?25l")
         sys.stdout.flush()
+
+        try:
+            while True:
+                screen = "\033[H\033[J"
+                switch_channels(interface, channel, family_id, netlink_socket)
+                screen += f"   Scanning channel {channel:<2}" + "\033[K\n\n"
+                screen += f"   {'BSSID':<18}   {'CH':<4}   {'ENC':<5}   {'CIPHER':<7}   {'AUTH':<5}   {'SSID':<18}   {'CLIENTS'}" + "\033[K\n\n"
+
+                scan_networks(sniff_socket, discovered_networks, discovered_clients)
+                for bssid, info in discovered_networks.items():
+                    client_count = sum(1 for clients, ap in discovered_clients.items() if ap == bssid)
+                    screen += f"   {bssid:<18}   {info[1]:<4}   {info[2]:<5}   {info[3]:<7}   {info[4]:<5}   {info[0]:<18}   {client_count}" + "\033[K\n"
+
+                screen += "\033[K\n"
+                screen += f"   {'BSSID':<18}   {'STATION':<18}" + "\033[K\n\n"
+
+                for client, ap in discovered_clients.items():
+                    screen += f"   {ap:<18}   {client:<18}" + "\033[K\n"
+
+                sys.stdout.write(screen)
+                sys.stdout.flush()
+
+                if channel == 14:
+                    channel = 36
+
+                elif channel < 14:
+                    channel += 1
+
+                elif channel == 144:
+                    channel = 149
+
+                elif channel >= 36:
+                    channel += 4
+
+                if channel > 177:
+                    channel = 1
+
+        except KeyboardInterrupt:
+            print("", end="\r")
+            sys.stdout.write("\033[?25h" + "Quitting...")
+            sys.stdout.flush()
+    except OSError:
+        print("Error: wireless interface not found")

@@ -259,10 +259,10 @@ def main():
             
         elif subcommand == subcommands.get(3):
             if len(sys.argv) < 3:
-                print("Error: missing interface and desired mode configuration")
+                print("Error: missing arguments for interface and mode configuration")
             elif len(sys.argv) < 4:
-                print("Error: missing desired mode configuration")
-            else:
+                print("Error: missing argument for mode configuration")
+            elif mode == "man" or mode == "mon":
                 set_link_state(interface, "down")
 
                 if mode == "man":
@@ -274,12 +274,16 @@ def main():
                 set_interface_mode(interface, request_mode, family_id, netlink_socket)
 
                 set_link_state(interface, "up")
+            else:
+                print("Error: invalid arguments")
         
         elif subcommand == subcommands.get(4):
-            print()
-            #switch_channels(interface, 44, family_id, netlink_socket)
-            #scan_networks(interface)
-            cycle_channels(interface, family_id, netlink_socket)
+            if len(sys.argv) < 3:
+                print("Error: missing argument for interface")
+            else:
+                #switch_channels(interface, 44, family_id, netlink_socket)
+                #scan_networks(interface)
+                cycle_channels(interface, family_id, netlink_socket)
                 
                 
         else:
