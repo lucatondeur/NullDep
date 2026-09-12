@@ -216,7 +216,7 @@ def main():
                     for line in lines:
                         iface = line.split()[0].replace(":", "")
                     
-                        if iface != "lo" and not iface.startswith("eth") and not iface.startswith("docker"):
+                        if os.path.isdir(f"/sys/class/net/{iface}/wireless"):
                             try:
                                 idx = socket.if_nametoindex(iface)
                             except OSError:
