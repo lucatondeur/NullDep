@@ -31,9 +31,11 @@ def main_nl_header(Length, Type, Flags, Sequence, PID):
     return nl_hdr
 
 def attribute_unpack(reply, reply_length, target_type, target_size):
+    target_id = None
+
     if target_size == "<H":
         i = 6 # 4 + 2-byte short (H)
-    if target_size == "<I":
+    elif target_size == "<I":
         i = 8 # 4 + 4-byte int (I)
     
     # Starting at offset 20, the  message is a series of attributes
