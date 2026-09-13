@@ -265,7 +265,9 @@ def main():
                 exit()
             
         elif subcommand == subcommands.get(3):
-            if len(sys.argv) < 3:
+            if os.geteuid() != 0:
+                print("Error: root privileges are required to alter interface mode")
+            elif len(sys.argv) < 3:
                 print("Error: missing arguments for interface and mode configuration")
             elif len(sys.argv) < 4:
                 print("Error: missing argument for mode configuration")
