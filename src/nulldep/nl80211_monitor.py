@@ -287,7 +287,9 @@ def main():
                 print("Error: invalid arguments")
         
         elif subcommand == subcommands.get(4):
-            if len(sys.argv) < 3:
+            if os.geteuid() != 0:
+                print("Error: root privileges are required to scan nearby networks")
+            elif len(sys.argv) < 3:
                 print("Error: missing argument for interface")
             else:
                 #switch_channels(interface, 44, family_id, netlink_socket)
